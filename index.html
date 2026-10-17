@@ -360,17 +360,22 @@
       client_id: GOOGLE_CLIENT_ID, scope: DRIVE_SCOPE, callback: () => {},
     });
   }
-  function requestToken(opts) {
+  function requestToken(opts, timeoutMs) {
     driveInit();
     if (!drive.tokenClient) return Promise.resolve({ error: 'unavailable' });
     return new Promise(resolve => {
-      drive.tokenClient.callback = resolve;
-      try { drive.tokenClient.requestAccessToken(opts); } catch (e) { resolve({ error: 'failed' }); }
+      let done = false;
+      const finish = r => { if (!done) { done = true; resolve(r); } };
+      drive.tokenClient.callback = finish;
+      try { drive.tokenClient.requestAccessToken(opts); } catch (e) { finish({ error: 'failed' }); }
+      // Kullanıcı etkileşimi olmadan (ör. sayfa açılışında) tetiklenen sessiz istekler,
+      // tarayıcı popup'ı engellediğinde hiç geri dönmeyebilir; bu yüzden zaman aşımı koyuyoruz.
+      if (timeoutMs) setTimeout(() => finish({ error: 'timeout' }), timeoutMs);
     });
   }
-  async function driveEnsureToken() {
+  async function driveEnsureToken(silentTimeoutMs) {
     if (drive.token && Date.now() < drive.tokenExpiry) return true;
-    const resp = await requestToken({ prompt: '' });
+    const resp = await requestToken({ prompt: '' }, silentTimeoutMs || 4000);
     if (resp.error || !resp.access_token) return false;
     drive.token = resp.access_token;
     drive.tokenExpiry = Date.now() + (Number(resp.expires_in || 3600) - 60) * 1000;
