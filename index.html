@@ -1,0 +1,946 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Stok">
+<title>Stok Takip</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root {
+    --bg:#f2f2f7; --card:#fff; --text:#000; --muted:#8e8e93; --sep:rgba(60,60,67,.18);
+    --accent:#007aff; --accent-soft:rgba(0,122,255,.12); --red:#ff3b30; --red-soft:rgba(255,59,48,.12);
+    --orange:#ff9500; --orange-soft:rgba(255,149,0,.14); --green:#34c759;
+    --fill:rgba(118,118,128,.12); --bar:rgba(249,249,249,.86); --seg-on:#fff; color-scheme:light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#000; --card:#1c1c1e; --text:#fff; --muted:#8e8e93; --sep:rgba(84,84,88,.6);
+      --accent:#0a84ff; --accent-soft:rgba(10,132,255,.2); --red:#ff453a; --red-soft:rgba(255,69,58,.2);
+      --orange:#ff9f0a; --orange-soft:rgba(255,159,10,.2); --green:#30d158;
+      --fill:rgba(118,118,128,.24); --bar:rgba(22,22,24,.86); --seg-on:#636366; color-scheme:dark;
+    }
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; background:var(--bg); color:var(--text); }
+  body { font-family:-apple-system, "SF Pro Text", system-ui, sans-serif; font-size:17px; line-height:1.3; -webkit-font-smoothing:antialiased; }
+  button, input { font:inherit; color:inherit; }
+  input { outline:none; }
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; }
+  .hidden { display:none !important; }
+
+  /* Üst başlık */
+  .nav { position:sticky; top:0; z-index:9; background:var(--bar); -webkit-backdrop-filter:saturate(180%) blur(20px); backdrop-filter:saturate(180%) blur(20px); border-bottom:.5px solid var(--sep); }
+  .nav-in { max-width:1000px; margin:0 auto; padding:calc(env(safe-area-inset-top) + 12px) 20px 10px; display:flex; align-items:flex-end; justify-content:space-between; gap:12px; }
+  .nav h1 { margin:0; font-size:34px; font-weight:700; letter-spacing:.3px; }
+  .nav .sub { color:var(--muted); font-size:15px; padding-bottom:6px; }
+
+  main { max-width:1000px; margin:0 auto; padding:16px 16px calc(100px + env(safe-area-inset-bottom)); }
+
+  /* Alt sekme çubuğu */
+  .tabbar { position:fixed; left:0; right:0; bottom:0; z-index:10; display:flex; justify-content:center; background:var(--bar); -webkit-backdrop-filter:saturate(180%) blur(20px); backdrop-filter:saturate(180%) blur(20px); border-top:.5px solid var(--sep); padding-bottom:env(safe-area-inset-bottom); }
+  .tabbar-in { display:flex; width:100%; max-width:600px; }
+  .tabbar button { flex:1; background:none; border:0; padding:7px 0 6px; color:var(--muted); font-size:11px; font-weight:500; display:flex; flex-direction:column; align-items:center; gap:3px; position:relative; cursor:pointer; }
+  .tabbar button svg { width:26px; height:26px; }
+  .tabbar button.active { color:var(--accent); }
+  .tabbar .badge { position:absolute; top:3px; left:calc(50% + 6px); min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--red); color:#fff; font-size:12px; font-weight:600; display:grid; place-items:center; }
+  .tabbar button.glow { color:var(--red); }
+  .tabbar button.glow svg { animation:pulse .9s ease-in-out infinite alternate; }
+  @keyframes pulse { from { transform:scale(1); filter:drop-shadow(0 0 0 transparent); } to { transform:scale(1.12); filter:drop-shadow(0 0 7px var(--red)); } }
+
+  /* Genel parçalar */
+  .card { background:var(--card); border-radius:14px; }
+  .sh { font-size:13px; text-transform:uppercase; letter-spacing:.2px; color:var(--muted); padding:0 16px 7px; margin-top:24px; display:flex; justify-content:space-between; align-items:center; }
+  .sh:first-child { margin-top:0; }
+  .sh .link { text-transform:none; font-size:15px; }
+  .list { background:var(--card); border-radius:12px; overflow:hidden; }
+  .li { display:flex; align-items:center; gap:12px; padding:11px 16px; min-height:44px; position:relative; }
+  .li + .li::before { content:""; position:absolute; top:0; left:16px; right:0; border-top:.5px solid var(--sep); }
+  .li .grow { flex:1; min-width:0; }
+  .muted { color:var(--muted); font-size:15px; }
+  .small { font-size:13px; }
+  .red { color:var(--red); }
+  .empty { padding:22px 16px; text-align:center; color:var(--muted); font-size:15px; }
+  .ic { width:30px; height:30px; border-radius:8px; display:grid; place-items:center; color:#fff; flex:none; }
+  .ic svg { width:18px; height:18px; }
+  .ic.red { background:var(--red); } .ic.orange { background:var(--orange); } .ic.gray { background:var(--muted); }
+
+  .search { display:flex; align-items:center; gap:6px; background:var(--fill); border-radius:10px; padding:8px 10px; margin-bottom:14px; }
+  .search svg { width:17px; height:17px; color:var(--muted); flex:none; }
+  .search input { flex:1; border:0; background:transparent; font-size:17px; min-width:0; }
+  .search input::placeholder { color:var(--muted); }
+
+  .btn-filled { background:var(--accent); color:#fff; border:0; border-radius:12px; padding:13px 18px; font-size:17px; font-weight:600; cursor:pointer; }
+  .btn-filled:disabled { opacity:.4; }
+  .btn-tinted { background:var(--accent-soft); color:var(--accent); border:0; border-radius:10px; padding:8px 14px; font-size:15px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .btn-tinted:disabled { opacity:.4; }
+  .link { background:none; border:0; color:var(--accent); font-size:16px; padding:6px 2px; cursor:pointer; }
+  .link.red { color:var(--red); }
+  .block { width:100%; }
+  button:active { opacity:.6; }
+
+  /* Satış */
+  .sell { display:grid; gap:20px; }
+  @media (min-width: 820px) { .sell { grid-template-columns:1fr 340px; align-items:start; } .cart { position:sticky; top:96px; } }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:10px; }
+  .tile { background:var(--card); border:0; border-radius:14px; padding:12px; text-align:left; min-height:104px; display:flex; flex-direction:column; gap:2px; position:relative; cursor:pointer; transition:transform .1s; box-shadow:inset 0 0 0 2px transparent; }
+  .tile:active { transform:scale(.96); opacity:1; }
+  .tile.in { box-shadow:inset 0 0 0 2px var(--accent); }
+  .tile.out { opacity:.4; }
+  .tile .name { font-weight:600; font-size:16px; padding-right:26px; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .tile .price { font-weight:600; margin-top:auto; }
+  .tile .stock { font-size:13px; color:var(--muted); }
+  .tile .stock.warn { color:var(--red); }
+  .tile .qb { position:absolute; top:9px; right:9px; min-width:24px; height:24px; padding:0 7px; border-radius:12px; background:var(--accent); color:#fff; font-size:14px; font-weight:600; display:grid; place-items:center; }
+
+  .stepper { display:flex; align-items:center; background:var(--fill); border-radius:9px; flex:none; }
+  .stepper button { width:34px; height:32px; border:0; background:none; color:var(--accent); font-size:20px; cursor:pointer; }
+  .stepper input { width:40px; border:0; background:transparent; text-align:center; font-size:16px; font-weight:600; }
+  .total-row { display:flex; justify-content:space-between; align-items:baseline; padding:14px 16px 4px; }
+  .total { font-size:28px; font-weight:700; letter-spacing:.3px; }
+
+  /* Ürünler */
+  .prod { padding:14px 16px; margin-bottom:12px; }
+  .prod-head { display:flex; justify-content:space-between; gap:12px; }
+  .prod-head .title { font-size:17px; font-weight:600; }
+  .prod-head .right { text-align:right; flex:none; }
+  .pills { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  .pill { background:var(--fill); border-radius:999px; padding:5px 11px; font-size:14px; color:var(--muted); }
+  .pill b { color:var(--text); font-weight:600; }
+  .pill.warn { background:var(--red-soft); color:var(--red); }
+  .pill.warn b { color:var(--red); }
+  .fill-row { display:flex; align-items:center; gap:8px; margin-top:12px; }
+  .field-sm { width:84px; background:var(--fill); border:0; border-radius:9px; padding:8px 10px; font-size:16px; text-align:center; }
+  .actions { display:flex; gap:18px; margin-top:8px; padding-top:8px; border-top:.5px solid var(--sep); }
+
+  .form { background:var(--bg); border-radius:14px; padding:14px 12px; border:.5px solid var(--sep); }
+  .prod .form { margin-top:12px; }
+  #addSlot .form { margin-bottom:16px; }
+  .form-title { font-size:20px; font-weight:700; padding:0 4px 4px; }
+  .ghead { font-size:13px; text-transform:uppercase; color:var(--muted); padding:16px 16px 6px; }
+  .gfoot { font-size:13px; color:var(--muted); padding:6px 16px 0; }
+  .group { background:var(--card); border-radius:11px; overflow:hidden; }
+  .frow { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 16px; min-height:46px; position:relative; }
+  .frow + .frow::before { content:""; position:absolute; top:0; left:16px; right:0; border-top:.5px solid var(--sep); }
+  .frow span { flex:none; }
+  .frow input { flex:1; min-width:0; border:0; background:transparent; text-align:right; font-size:17px; padding:12px 0; }
+  .frow input::placeholder { color:var(--muted); }
+  .form-actions { display:flex; gap:10px; margin-top:16px; }
+  .form-actions button { flex:1; }
+  .btn-gray { background:var(--fill); color:var(--text); border:0; border-radius:12px; padding:13px 18px; font-size:17px; font-weight:600; cursor:pointer; }
+
+  /* Rapor */
+  .tiles2 { display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; }
+  @media (min-width: 700px) { .tiles2 { grid-template-columns:repeat(4, 1fr); } }
+  .tl { background:var(--card); border-radius:14px; padding:14px; }
+  .tl .k { font-size:13px; color:var(--muted); }
+  .tl .v { font-size:22px; font-weight:700; margin-top:4px; letter-spacing:.2px; }
+
+  .seg { display:flex; background:var(--fill); border-radius:9px; padding:2px; gap:2px; }
+  .seg button { flex:1; border:0; background:none; padding:7px 6px; font-size:14px; font-weight:600; border-radius:7px; cursor:pointer; }
+  .seg button.on { background:var(--seg-on); box-shadow:0 1px 3px rgba(0,0,0,.12); }
+  .seg button:active { opacity:1; }
+  .controls { display:grid; gap:10px; }
+  .date-row { display:flex; gap:10px; align-items:center; }
+  .date-row input { flex:1; min-width:0; background:var(--card); border:0; border-radius:10px; padding:11px 12px; font-size:17px; }
+  .rep-head { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin:22px 4px 10px; flex-wrap:wrap; }
+  .rep-head h2 { margin:0; font-size:22px; font-weight:700; }
+  .chart-card { background:var(--card); border-radius:14px; padding:14px 14px 10px; }
+  .chart-card svg { display:block; width:100%; height:auto; }
+  .chart-card .bar { fill:var(--accent); cursor:pointer; }
+  .chart-card .bar.sel { fill:var(--orange); }
+  .chart-card .axis { font-size:10px; fill:var(--muted); }
+  .chart-card .grid { stroke:var(--sep); stroke-width:1; }
+  .chart-info { font-size:14px; color:var(--muted); min-height:20px; margin-top:6px; text-align:center; }
+  .donut-wrap { display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
+  .donut-wrap svg { width:160px; height:160px; flex:none; margin:0 auto; }
+  .legend { flex:1; min-width:220px; }
+  .lg-row { display:flex; align-items:center; gap:10px; padding:7px 0; }
+  .lg-row + .lg-row { border-top:.5px solid var(--sep); }
+  .lg-row .grow { flex:1; min-width:0; }
+  .dot { width:11px; height:11px; border-radius:50%; flex:none; }
+  .meter { height:6px; background:var(--fill); border-radius:3px; margin-top:4px; overflow:hidden; }
+  .meter i { display:block; height:100%; border-radius:3px; }
+  .delta { font-size:13px; font-weight:600; margin-top:2px; }
+  .delta.up { color:var(--green); } .delta.down { color:var(--red); }
+  .toast { position:fixed; left:50%; bottom:calc(76px + env(safe-area-inset-bottom)); transform:translate(-50%, 10px); background:rgba(30,30,32,.92); color:#fff; padding:11px 18px; border-radius:999px; font-size:15px; font-weight:500; opacity:0; transition:opacity .2s, transform .2s; pointer-events:none; z-index:20; max-width:90vw; text-align:center; }
+  .toast.show { opacity:1; transform:translate(-50%, 0); }
+</style>
+</head>
+<body>
+
+<header class="nav"><div class="nav-in"><h1 id="pageTitle">Satış</h1><span class="sub" id="pageSub"></span></div></header>
+
+<main>
+  <!-- SATIŞ -->
+  <section id="tab-sell">
+    <div class="sell">
+      <div>
+        <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="sellSearch" placeholder="Ürün ara" type="search"></div>
+        <div class="tiles" id="sellList"></div>
+      </div>
+      <div class="cart">
+        <div class="sh">Sepet <button class="link" id="clearCart">Temizle</button></div>
+        <div class="list">
+          <div id="cartItems"></div>
+          <div class="total-row"><span class="muted">Toplam</span><span class="total" id="cartTotal">0,00 ₺</span></div>
+          <div style="padding:10px 16px 16px"><button class="btn-filled block" id="checkout">Satışı tamamla</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ÜRÜNLER -->
+  <section id="tab-products" class="hidden">
+    <button class="btn-filled block" id="addBtn" style="margin-bottom:14px">+ Ürün ekle</button>
+    <div id="addSlot"></div>
+    <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="prodSearch" placeholder="Ürün ara" type="search"></div>
+    <div id="prodList"></div>
+
+    <div id="formHolder" class="hidden">
+      <div class="form" id="productForm">
+        <div class="form-title" id="formTitle">Yeni ürün</div>
+        <input type="hidden" id="editId">
+        <div class="ghead">Ürün</div>
+        <div class="group">
+          <label class="frow"><span>Ad</span><input id="pName" placeholder="Zorunlu" autocomplete="off"></label>
+          <label class="frow"><span>Kategori</span><input id="pCat" placeholder="İsteğe bağlı" autocomplete="off"></label>
+        </div>
+        <div class="ghead">Fiyat (₺)</div>
+        <div class="group">
+          <label class="frow"><span>Alış</span><input id="pCost" type="number" step="0.01" inputmode="decimal" placeholder="0,00"></label>
+          <label class="frow"><span>Satış</span><input id="pPrice" type="number" step="0.01" inputmode="decimal" placeholder="0,00"></label>
+        </div>
+        <div class="ghead">Stok (adet)</div>
+        <div class="group">
+          <label class="frow"><span>Depoda</span><input id="pDepot" type="number" inputmode="numeric" placeholder="0"></label>
+          <label class="frow"><span>Rafta</span><input id="pShelf" type="number" inputmode="numeric" placeholder="0"></label>
+        </div>
+        <div class="ghead">Uyarı limitleri (adet)</div>
+        <div class="group">
+          <label class="frow"><span>Raf limiti</span><input id="pMin" type="number" inputmode="numeric" value="5"></label>
+          <label class="frow"><span>Depo limiti</span><input id="pDMin" type="number" inputmode="numeric" value="5"></label>
+        </div>
+        <div class="gfoot">Rafta ya da depoda bu adet ve altı kalınca Uyarılar sekmesi yanıp söner.</div>
+        <div class="form-actions">
+          <button class="btn-gray" id="resetForm">İptal</button>
+          <button class="btn-filled" id="saveProduct">Kaydet</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- UYARILAR -->
+  <section id="tab-alerts" class="hidden">
+    <div id="alertBox"></div>
+  </section>
+
+  <!-- RAPOR -->
+  <section id="tab-report" class="hidden">
+    <div class="seg" id="repView" style="margin-bottom:18px">
+      <button data-v="sales" class="on">Satış raporu</button>
+      <button data-v="stock">Stok durumu</button>
+    </div>
+
+    <div id="view-sales">
+      <div class="controls">
+        <div class="seg" id="periodSeg">
+          <button data-p="day" class="on">Günlük</button>
+          <button data-p="week">Haftalık</button>
+          <button data-p="month">Aylık</button>
+        </div>
+        <div class="date-row">
+          <input type="date" id="repDate">
+          <button class="btn-filled" id="makeReport">Rapor oluştur</button>
+        </div>
+      </div>
+      <div id="reportOut"><div class="card empty" style="margin-top:16px">Dönemi ve tarihi seçip "Rapor oluştur"a basın.</div></div>
+    </div>
+
+    <div id="view-stock" class="hidden">
+    <div class="tiles2">
+      <div class="tl"><div class="k">Bugünkü satış</div><div class="v" id="rToday">0</div></div>
+      <div class="tl"><div class="k">Ürün çeşidi</div><div class="v" id="rCount">0</div></div>
+      <div class="tl"><div class="k">Raftaki adet</div><div class="v" id="rShelfQty">0</div></div>
+      <div class="tl"><div class="k">Depodaki adet</div><div class="v" id="rDepotQty">0</div></div>
+    </div>
+    <div class="sh">Stok değeri</div>
+    <div class="list">
+      <div class="li"><span class="grow">Raf · maliyet</span><b id="rShelfCost"></b></div>
+      <div class="li"><span class="grow">Raf · satış</span><b id="rShelfSale"></b></div>
+      <div class="li"><span class="grow">Depo · maliyet</span><b id="rDepotCost"></b></div>
+      <div class="li"><span class="grow">Depo · satış</span><b id="rDepotSale"></b></div>
+      <div class="li"><span class="grow">Toplam · satış</span><b id="rAllSale"></b></div>
+    </div>
+    <div class="sh">Son satışlar</div>
+    <div class="list" id="salesList"></div>
+    <div class="sh">Google Drive senkronizasyonu</div>
+    <div class="list">
+      <div class="li"><span class="grow muted" id="syncStatus">Cihazlar arasında aynı verileri görmek için Google ile giriş yapın.</span></div>
+      <div class="li" style="gap:10px">
+        <button class="btn-tinted" id="driveSignIn">Google ile giriş yap</button>
+        <button class="btn-tinted hidden" id="driveSync">Şimdi senkronize et</button>
+        <button class="link red hidden" id="driveSignOut">Çıkış yap</button>
+      </div>
+    </div>
+    <div class="sh">Yedek</div>
+    <div class="list">
+      <div class="li"><span class="grow muted">Verileri dosya olarak indirip saklayabilir, sonra geri yükleyebilirsiniz.</span></div>
+      <div class="li" style="gap:10px">
+        <button class="btn-tinted" id="exportBtn">Dışa aktar</button>
+        <label class="btn-tinted" style="cursor:pointer">İçe aktar<input type="file" id="importFile" accept="application/json,.json" class="hidden"></label>
+      </div>
+    </div>
+    </div>
+  </section>
+</main>
+
+<nav class="tabbar"><div class="tabbar-in">
+  <button data-tab="sell" class="active">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.2 10.2a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.5L20.5 8H6"/><circle cx="10" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></svg>Satış</button>
+  <button data-tab="products">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>Ürünler</button>
+  <button data-tab="alerts" id="alertsTab">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 16V11a6 6 0 1 0-12 0v5l-2 2h16l-2-2Z"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>Uyarılar<span class="badge hidden" id="alertBadge"></span></button>
+  <button data-tab="report">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Rapor</button>
+</div></nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  const KEY = 'stokTakipV1';
+  const TITLES = { sell:'Satış', products:'Ürünler', alerts:'Uyarılar', report:'Rapor' };
+  const $ = id => document.getElementById(id);
+  let db = load();
+  let cart = [];
+  let tab = 'sell';
+  let formMode = null; // null = kapalı, 'add' = yeni ürün, ürün id = o ürünü düzenle
+
+  function norm(p) {
+    p.name = String(p.name || ''); p.cat = String(p.cat || '');
+    p.cost = +p.cost || 0; p.price = +p.price || 0;
+    p.depot = Math.max(0, Math.floor(+p.depot || 0)); p.shelf = Math.max(0, Math.floor(+p.shelf || 0));
+    if (p.min == null) p.min = 5; if (p.dMin == null) p.dMin = 5;
+    p.ack = !!p.ack; p.ackD = !!p.ackD;
+    return p;
+  }
+  function load() {
+    try {
+      const d = JSON.parse(localStorage.getItem(KEY));
+      if (d && Array.isArray(d.products)) { d.products.forEach(norm); d.sales = d.sales || []; return d; }
+    } catch (e) {}
+    return { products: [], sales: [] };
+  }
+  function save(skipPush) {
+    try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { toast('Kaydedilemedi'); }
+    if (!skipPush) scheduleDrivePush();
+  }
+
+  // ---- Google Drive senkronizasyonu ----
+  // Veriler localStorage'da kalır (çevrimdışı/yedek); giriş yapılınca aynı dosya Drive'da da tutulur,
+  // böylece iPad/iPhone/bilgisayar aynı verileri görür. drive.file kapsamı: Drive sadece bu uygulamanın
+  // oluşturduğu dosyaya erişir, hesabın diğer dosyalarına dokunmaz.
+  const GOOGLE_CLIENT_ID = 'BURAYA_GOOGLE_CLIENT_ID_GELECEK'; // Google Cloud Console > Kimlik Bilgileri
+  const DRIVE_FILE_NAME = 'stok-takip-verisi.json';
+  const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+  const DRIVE_API = 'https://www.googleapis.com/drive/v3';
+  const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
+  const drive = { token: null, tokenExpiry: 0, fileId: null, tokenClient: null, pushTimer: null, busy: false };
+
+  function driveConfigured() { return !GOOGLE_CLIENT_ID.startsWith('BURAYA_'); }
+  function driveAvailable() { return driveConfigured() && typeof google !== 'undefined' && google.accounts; }
+
+  function driveInit() {
+    if (!driveAvailable() || drive.tokenClient) return;
+    drive.tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID, scope: DRIVE_SCOPE, callback: () => {},
+    });
+  }
+  function requestToken(opts) {
+    driveInit();
+    if (!drive.tokenClient) return Promise.resolve({ error: 'unavailable' });
+    return new Promise(resolve => {
+      drive.tokenClient.callback = resolve;
+      try { drive.tokenClient.requestAccessToken(opts); } catch (e) { resolve({ error: 'failed' }); }
+    });
+  }
+  async function driveEnsureToken() {
+    if (drive.token && Date.now() < drive.tokenExpiry) return true;
+    const resp = await requestToken({ prompt: '' });
+    if (resp.error || !resp.access_token) return false;
+    drive.token = resp.access_token;
+    drive.tokenExpiry = Date.now() + (Number(resp.expires_in || 3600) - 60) * 1000;
+    return true;
+  }
+  async function driveApi(path, opts = {}) {
+    const res = await fetch(DRIVE_API + path, { ...opts, headers: { Authorization: 'Bearer ' + drive.token, ...(opts.headers || {}) } });
+    if (!res.ok) throw new Error('drive_' + res.status);
+    return res.json();
+  }
+  async function driveFindFile() {
+    const q = encodeURIComponent(`name='${DRIVE_FILE_NAME}' and trashed=false`);
+    const data = await driveApi(`/files?q=${q}&fields=files(id,modifiedTime)&spaces=drive`);
+    return (data.files && data.files[0]) || null;
+  }
+  async function driveCreateFile(content) {
+    const res = await fetch(`${DRIVE_UPLOAD}?uploadType=multipart&fields=id,modifiedTime`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + drive.token, 'Content-Type': 'multipart/related; boundary=stoktakip' },
+      body: `--stoktakip\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name: DRIVE_FILE_NAME, mimeType: 'application/json' })}\r\n` +
+            `--stoktakip\r\nContent-Type: application/json\r\n\r\n${content}\r\n--stoktakip--`,
+    });
+    if (!res.ok) throw new Error('drive_' + res.status);
+    return res.json();
+  }
+  async function driveUpdateFile(fileId, content) {
+    const res = await fetch(`${DRIVE_UPLOAD}/${fileId}?uploadType=media&fields=modifiedTime`, {
+      method: 'PATCH',
+      headers: { Authorization: 'Bearer ' + drive.token, 'Content-Type': 'application/json' },
+      body: content,
+    });
+    if (!res.ok) throw new Error('drive_' + res.status);
+    return res.json();
+  }
+  async function driveGetContent(fileId) {
+    const res = await fetch(`${DRIVE_API}/files/${fileId}?alt=media`, { headers: { Authorization: 'Bearer ' + drive.token } });
+    if (!res.ok) throw new Error('drive_' + res.status);
+    return res.text();
+  }
+  function syncUI(text) {
+    const signedIn = !!drive.token;
+    $('driveSignIn').classList.toggle('hidden', signedIn);
+    $('driveSync').classList.toggle('hidden', !signedIn);
+    $('driveSignOut').classList.toggle('hidden', !signedIn);
+    if (!driveConfigured()) text = 'Senkronizasyon henüz kurulmadı.';
+    $('syncStatus').textContent = text || (signedIn ? 'Google Drive ile bağlı.' : 'Cihazlar arasında aynı verileri görmek için Google ile giriş yapın.');
+  }
+  async function drivePullMerge(opts = {}) {
+    if (drive.busy) return;
+    drive.busy = true;
+    syncUI('Senkronize ediliyor…');
+    try {
+      const ok = await driveEnsureToken();
+      if (!ok) { drive.token = null; syncUI(); return; }
+      let f = await driveFindFile();
+      if (!f) {
+        const created = await driveCreateFile(JSON.stringify(db));
+        drive.fileId = created.id;
+        if (!opts.silent) toast('Veriler Google Drive\'a yüklendi');
+      } else {
+        drive.fileId = f.id;
+        const remote = JSON.parse(await driveGetContent(f.id));
+        if (Array.isArray(remote.products)) {
+          db = { products: remote.products.map(norm), sales: remote.sales || [] };
+          save(true); cart = []; formMode = null; renderAll();
+          if (!opts.silent) toast('Google Drive\'dan veriler yüklendi');
+        }
+      }
+      localStorage.setItem('stokTakipDriveOn', '1');
+      syncUI('Son senkronizasyon: ' + new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }));
+    } catch (e) {
+      syncUI('Senkronizasyon başarısız, bağlantıyı kontrol edin.');
+    } finally { drive.busy = false; }
+  }
+  function scheduleDrivePush() {
+    if (!drive.token || !drive.fileId) return;
+    clearTimeout(drive.pushTimer);
+    drive.pushTimer = setTimeout(drivePush, 1200);
+  }
+  async function drivePush() {
+    if (!drive.token || !drive.fileId) return;
+    try {
+      const ok = await driveEnsureToken();
+      if (!ok) return;
+      await driveUpdateFile(drive.fileId, JSON.stringify(db));
+      syncUI('Son senkronizasyon: ' + new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }));
+    } catch (e) { syncUI('Senkronizasyon başarısız, bağlantıyı kontrol edin.'); }
+  }
+  $('driveSignIn').onclick = async () => {
+    if (!driveAvailable()) return toast('Senkronizasyon henüz kurulmadı');
+    const resp = await requestToken({ prompt: '' });
+    if (resp.error || !resp.access_token) return toast('Google girişi başarısız');
+    drive.token = resp.access_token;
+    drive.tokenExpiry = Date.now() + (Number(resp.expires_in || 3600) - 60) * 1000;
+    await drivePullMerge();
+  };
+  $('driveSync').onclick = () => drivePullMerge();
+  $('driveSignOut').onclick = () => {
+    if (drive.token && google.accounts && google.accounts.oauth2.revoke) google.accounts.oauth2.revoke(drive.token, () => {});
+    drive.token = null; drive.fileId = null;
+    localStorage.removeItem('stokTakipDriveOn');
+    syncUI();
+    toast('Google Drive bağlantısı kapatıldı');
+  };
+  // Önceden giriş yapılmışsa sayfa açılışında sessizce yeniden bağlan
+  window.addEventListener('load', () => {
+    if (localStorage.getItem('stokTakipDriveOn') === '1') {
+      const tryAuto = () => { if (driveAvailable()) drivePullMerge({ silent: true }); else setTimeout(tryAuto, 300); };
+      tryAuto();
+    } else syncUI();
+  });
+
+  const fmt = n => (Number(n) || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const shelfLow = p => p.shelf <= p.min;
+  const depotLow = p => p.depot <= p.dMin;
+  const find = id => db.products.find(x => x.id === id);
+  const matches = (p, q) => !q || (p.name + ' ' + p.cat).toLocaleLowerCase('tr').includes(q);
+  function toast(msg) {
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 1900);
+  }
+
+  // SEKMELER
+  document.querySelectorAll('.tabbar button').forEach(b => b.onclick = () => {
+    tab = b.dataset.tab;
+    document.querySelectorAll('.tabbar button').forEach(x => x.classList.toggle('active', x === b));
+    Object.keys(TITLES).forEach(t => $('tab-' + t).classList.toggle('hidden', t !== tab));
+    $('pageTitle').textContent = TITLES[tab];
+    window.scrollTo(0, 0);
+    renderAll();
+  });
+
+  // SATIŞ
+  function renderSell() {
+    const q = $('sellSearch').value.trim().toLocaleLowerCase('tr');
+    const list = db.products.filter(p => matches(p, q));
+    $('sellList').innerHTML = list.length ? list.map(p => {
+      const stock = p.shelf + p.depot;
+      const inCart = cart.find(c => c.id === p.id);
+      return `<button class="tile ${inCart ? 'in' : ''} ${stock ? '' : 'out'}" data-id="${p.id}">
+        ${inCart ? `<span class="qb">${inCart.qty}</span>` : ''}
+        <span class="name">${esc(p.name)}</span>
+        <span class="stock ${shelfLow(p) ? 'warn' : ''}">Raf ${p.shelf} · Depo ${p.depot}</span>
+        <span class="price">${fmt(p.price)}</span>
+      </button>`;
+    }).join('') : `<div class="card empty" style="grid-column:1/-1">${db.products.length ? 'Sonuç yok' : 'Henüz ürün yok. Ürünler sekmesinden ekleyin.'}</div>`;
+    renderCart();
+  }
+  function renderCart() {
+    let sum = 0;
+    const rows = cart.map((c, i) => {
+      const p = find(c.id); if (!p) return '';
+      sum += p.price * c.qty;
+      return `<div class="li">
+        <div class="grow"><div style="font-weight:600">${esc(p.name)}</div><div class="muted small">${fmt(p.price)} × ${c.qty} = ${fmt(p.price * c.qty)}</div></div>
+        <div class="stepper">
+          <button data-act="dec" data-i="${i}">−</button>
+          <input type="number" inputmode="numeric" value="${c.qty}" data-i="${i}">
+          <button data-act="inc" data-i="${i}">+</button>
+        </div></div>`;
+    }).join('');
+    $('cartItems').innerHTML = rows || '<div class="empty">Ürünlere dokunarak sepete ekleyin</div>';
+    $('cartTotal').textContent = fmt(sum);
+    $('checkout').disabled = !cart.length;
+    $('clearCart').classList.toggle('hidden', !cart.length);
+  }
+  function addToCart(id) {
+    const p = find(id); if (!p) return;
+    if (p.shelf + p.depot <= 0) return toast('Stok yok');
+    const c = cart.find(x => x.id === id);
+    if (c) { if (c.qty + 1 > p.shelf + p.depot) return toast('Yeterli stok yok'); c.qty++; }
+    else cart.push({ id, qty: 1 });
+    renderSell();
+  }
+  $('sellList').onclick = e => { const el = e.target.closest('.tile'); if (el) addToCart(el.dataset.id); };
+  $('cartItems').onclick = e => {
+    const b = e.target.closest('button[data-act]'); if (!b) return;
+    const i = +b.dataset.i, c = cart[i]; if (!c) return;
+    const p = find(c.id), max = p ? p.shelf + p.depot : 0;
+    if (b.dataset.act === 'inc') { if (c.qty + 1 > max) return toast('Yeterli stok yok'); c.qty++; }
+    if (b.dataset.act === 'dec') { c.qty--; if (c.qty <= 0) cart.splice(i, 1); }
+    renderSell();
+  };
+  $('cartItems').onchange = e => {
+    const i = +e.target.dataset.i, c = cart[i]; if (!c) return;
+    const p = find(c.id);
+    let v = Math.floor(Number(e.target.value));
+    if (!(v > 0)) { cart.splice(i, 1); return renderSell(); }
+    if (v > p.shelf + p.depot) { toast('Yeterli stok yok'); v = p.shelf + p.depot; }
+    c.qty = v; renderSell();
+  };
+  $('clearCart').onclick = () => { cart = []; renderSell(); };
+  $('sellSearch').oninput = renderSell;
+
+  $('checkout').onclick = () => {
+    if (!cart.length) return;
+    for (const c of cart) {
+      const p = find(c.id);
+      if (!p || c.qty > p.shelf + p.depot) return toast('Stok yetersiz: ' + (p ? p.name : ''));
+    }
+    const items = []; let sum = 0;
+    for (const c of cart) {
+      const p = find(c.id);
+      let rest = c.qty;                       // önce raftan, yetmezse depodan düş
+      const fromShelf = Math.min(rest, p.shelf); p.shelf -= fromShelf; rest -= fromShelf;
+      p.depot -= rest;
+      items.push({ id: p.id, name: p.name, cat: p.cat, qty: c.qty, price: p.price, cost: p.cost, total: p.price * c.qty });
+      sum += p.price * c.qty;
+    }
+    db.sales.unshift({ id: uid(), date: new Date().toISOString(), items, total: sum });
+    save(); cart = []; renderAll();
+    toast('Satış kaydedildi · ' + fmt(sum));
+  };
+
+  // ÜRÜNLER
+  const FIELDS = ['editId','pName','pCat','pCost','pPrice','pDepot','pShelf'];
+  function resetForm() {
+    FIELDS.forEach(id => $(id).value = '');
+    $('pMin').value = 5; $('pDMin').value = 5; $('formTitle').textContent = 'Yeni ürün';
+  }
+  function placeForm() {
+    const slot = formMode === 'add' ? $('addSlot') : formMode ? $('edit-slot-' + formMode) : null;
+    (slot || $('formHolder')).appendChild($('productForm'));
+    if (!slot) formMode = null;
+    $('addBtn').textContent = formMode === 'add' ? 'Kapat' : '+ Ürün ekle';
+    $('addBtn').className = (formMode === 'add' ? 'btn-gray' : 'btn-filled') + ' block';
+  }
+  function closeForm() { formMode = null; resetForm(); renderProducts(); }
+  $('resetForm').onclick = closeForm;
+  $('addBtn').onclick = () => {
+    if (formMode === 'add') return closeForm();
+    resetForm(); formMode = 'add'; renderProducts(); $('pName').focus();
+  };
+  $('saveProduct').onclick = () => {
+    const name = $('pName').value.trim();
+    if (!name) { $('pName').focus(); return toast('Ürün adı girin'); }
+    const int = id => Math.max(0, Math.floor(+$(id).value || 0));
+    const data = {
+      name, cat: $('pCat').value.trim(),
+      cost: +$('pCost').value || 0, price: +$('pPrice').value || 0,
+      depot: int('pDepot'), shelf: int('pShelf'), min: int('pMin'), dMin: int('pDMin'),
+    };
+    const id = $('editId').value;
+    if (id) Object.assign(find(id), data);
+    else db.products.push(norm({ id: uid(), ...data }));
+    formMode = null; save(); resetForm(); renderAll(); toast('Kaydedildi');
+  };
+  function renderProducts() {
+    const q = $('prodSearch').value.trim().toLocaleLowerCase('tr');
+    const list = db.products.filter(p => matches(p, q) || p.id === formMode);
+    $('formHolder').appendChild($('productForm')); // liste yeniden çizilmeden önce formu koru
+    $('prodList').innerHTML = list.length ? list.map(p => `
+      <div class="card prod">
+        <div class="prod-head">
+          <div style="min-width:0"><div class="title">${esc(p.name)}</div><div class="muted">${esc(p.cat) || '—'}</div></div>
+          <div class="right"><div class="title">${fmt(p.price)}</div><div class="muted small">Alış ${fmt(p.cost)}</div></div>
+        </div>
+        <div class="pills">
+          <span class="pill ${shelfLow(p) ? 'warn' : ''}">Raf <b>${p.shelf}</b> · limit ${p.min}</span>
+          <span class="pill ${depotLow(p) ? 'warn' : ''}">Depo <b>${p.depot}</b> · limit ${p.dMin}</span>
+        </div>
+        <div class="fill-row">
+          <input class="field-sm" type="number" inputmode="numeric" min="1" placeholder="Adet" id="fill-${p.id}" ${p.depot ? '' : 'disabled'}>
+          <button class="btn-tinted" data-fill="${p.id}" ${p.depot ? '' : 'disabled'}>Raf doldur</button>
+          ${p.depot ? '' : '<span class="muted small">Depo boş</span>'}
+        </div>
+        <div class="actions">
+          <button class="link" data-edit="${p.id}">${formMode === p.id ? 'Kapat' : 'Düzenle'}</button>
+          <button class="link red" data-del="${p.id}">Sil</button>
+        </div>
+        <div id="edit-slot-${p.id}"></div>
+      </div>`).join('') : `<div class="card empty">${db.products.length ? 'Sonuç yok' : 'Henüz ürün yok'}</div>`;
+    placeForm();
+  }
+  $('prodSearch').oninput = renderProducts;
+  $('prodList').onclick = e => {
+    const t = e.target.closest('button'); if (!t) return;
+    const { edit, del, fill } = t.dataset;
+    if (fill) {
+      const p = find(fill); if (!p) return;
+      const n = Math.floor(Number($('fill-' + fill).value));
+      if (!(n > 0)) return toast('Rafa konacak adedi girin');
+      if (n > p.depot) return toast('Depoda sadece ' + p.depot + ' adet var');
+      p.depot -= n; p.shelf += n;
+      if (formMode === p.id) { $('pDepot').value = p.depot; $('pShelf').value = p.shelf; }
+      save(); renderAll();
+      toast(p.name + ' · ' + n + ' adet rafa alındı');
+    }
+    if (edit) {
+      if (formMode === edit) return closeForm();
+      const p = find(edit);
+      $('editId').value = p.id; $('pName').value = p.name; $('pCat').value = p.cat;
+      $('pCost').value = p.cost; $('pPrice').value = p.price; $('pDepot').value = p.depot;
+      $('pShelf').value = p.shelf; $('pMin').value = p.min; $('pDMin').value = p.dMin;
+      $('formTitle').textContent = 'Ürünü düzenle';
+      formMode = edit; renderProducts();
+    }
+    if (del && confirm('Bu ürün silinsin mi?')) {
+      if (formMode === del) { formMode = null; resetForm(); }
+      db.products = db.products.filter(p => p.id !== del); cart = cart.filter(c => c.id !== del);
+      save(); renderAll();
+    }
+  };
+
+  // UYARILAR
+  // Stok limitin üstüne çıkınca "gördüm" sıfırlanır; tekrar düşerse yeniden uyarır
+  function syncAlerts() {
+    let ch = false;
+    db.products.forEach(p => {
+      if (!shelfLow(p) && p.ack) { p.ack = false; ch = true; }
+      if (!depotLow(p) && p.ackD) { p.ackD = false; ch = true; }
+    });
+    if (ch) save();
+  }
+  const ICON_SHELF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>';
+  const ICON_BOX = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/></svg>';
+  function alertRow(p, kind) {
+    const seen = kind === 'shelf' ? p.ack : p.ackD;
+    const title = kind === 'shelf' ? `Rafta ${p.shelf} adet kaldı` : (p.depot ? `Depoda ${p.depot} adet kaldı` : 'Depo tükendi');
+    const hint = kind === 'shelf'
+      ? (p.depot ? `Depoda ${p.depot} adet var, rafa alınabilir` : 'Depoda da yok')
+      : 'Sipariş vermeyi düşünün';
+    return `<div class="li" style="${seen ? 'opacity:.55' : ''}">
+      <span class="ic ${seen ? 'gray' : kind === 'shelf' ? 'red' : 'orange'}">${kind === 'shelf' ? ICON_SHELF : ICON_BOX}</span>
+      <div class="grow"><div style="font-weight:600">${esc(p.name)}</div>
+        <div class="small ${seen ? 'muted' : 'red'}">${title} · limit ${kind === 'shelf' ? p.min : p.dMin}</div>
+        <div class="muted small">${hint}</div></div>
+      ${seen ? '<span class="muted small">Görüldü</span>' : `<button class="btn-tinted" data-ack="${p.id}" data-kind="${kind}">Gördüm</button>`}
+    </div>`;
+  }
+  function renderAlerts() {
+    syncAlerts();
+    const order = key => (a, b) => (a[key] === b[key] ? 0 : a[key] ? 1 : -1);
+    const shelf = db.products.filter(shelfLow).sort(order('ack'));
+    const depot = db.products.filter(depotLow).sort(order('ackD'));
+    const unseen = shelf.filter(p => !p.ack).length + depot.filter(p => !p.ackD).length;
+
+    $('alertBadge').textContent = unseen;
+    $('alertBadge').classList.toggle('hidden', !unseen);
+    $('alertsTab').classList.toggle('glow', unseen > 0);
+    $('pageSub').textContent = tab === 'alerts' && unseen ? unseen + ' yeni uyarı' : '';
+
+    if (!shelf.length && !depot.length) { $('alertBox').innerHTML = '<div class="card empty">Her şey yolunda, uyarı yok.</div>'; return; }
+    $('alertBox').innerHTML =
+      (unseen ? '<button class="btn-tinted block" id="ackAll" style="margin-bottom:6px;padding:11px">Tümünü gördüm</button>' : '') +
+      (shelf.length ? `<div class="sh">Raf</div><div class="list">${shelf.map(p => alertRow(p, 'shelf')).join('')}</div>` : '') +
+      (depot.length ? `<div class="sh">Depo</div><div class="list">${depot.map(p => alertRow(p, 'depot')).join('')}</div>` : '');
+  }
+  $('alertBox').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.id === 'ackAll') {
+      db.products.forEach(p => { if (shelfLow(p)) p.ack = true; if (depotLow(p)) p.ackD = true; });
+    } else if (b.dataset.ack) {
+      const p = find(b.dataset.ack); if (!p) return;
+      if (b.dataset.kind === 'shelf') p.ack = true; else p.ackD = true;
+    } else return;
+    save(); renderAlerts();
+  };
+
+  // RAPOR
+  function renderReport() {
+    const sum = fn => db.products.reduce((s, p) => s + fn(p), 0);
+    const today = new Date().toDateString();
+    $('rToday').textContent = fmt(db.sales.filter(s => new Date(s.date).toDateString() === today).reduce((s, x) => s + x.total, 0));
+    $('rCount').textContent = db.products.length;
+    $('rShelfQty').textContent = sum(p => p.shelf);
+    $('rDepotQty').textContent = sum(p => p.depot);
+    $('rShelfCost').textContent = fmt(sum(p => p.shelf * p.cost));
+    $('rShelfSale').textContent = fmt(sum(p => p.shelf * p.price));
+    $('rDepotCost').textContent = fmt(sum(p => p.depot * p.cost));
+    $('rDepotSale').textContent = fmt(sum(p => p.depot * p.price));
+    $('rAllSale').textContent = fmt(sum(p => (p.shelf + p.depot) * p.price));
+    $('salesList').innerHTML = db.sales.length ? db.sales.slice(0, 20).map(s => `
+      <div class="li"><div class="grow">
+        <div class="small muted">${new Date(s.date).toLocaleString('tr-TR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}</div>
+        <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.items.map(i => esc(i.name) + ' ×' + i.qty).join(', ')}</div>
+      </div><b>${fmt(s.total)}</b></div>`).join('') : '<div class="empty">Henüz satış yok</div>';
+  }
+
+  $('exportBtn').onclick = () => {
+    const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'stok-yedek-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+  $('importFile').onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const d = JSON.parse(r.result);
+        if (!Array.isArray(d.products)) throw 0;
+        if (!confirm('Mevcut veriler yedektekiyle değiştirilecek. Devam edilsin mi?')) return;
+        db = { products: d.products.map(norm), sales: d.sales || [] };
+        cart = []; formMode = null; save(); renderAll(); toast('Yedek yüklendi');
+      } catch (err) { toast('Geçersiz yedek dosyası'); }
+      e.target.value = '';
+    };
+    r.readAsText(f);
+  };
+
+  // SATIŞ RAPORU
+  const COLORS = ['#007aff','#34c759','#ff9500','#af52de','#ff2d55','#5ac8fa','#ffcc00','#5856d6','#a2845e','#8e8e93'];
+  const DAYS = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
+  const DAY_MS = 86400000;
+  let period = 'day';
+  let lastChart = null;
+  const pad = n => String(n).padStart(2, '0');
+  const isoDate = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  const dayOf = (d, add = 0) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + add);
+  $('repDate').value = isoDate(new Date());
+
+  function segSelect(seg, b) { [...seg.children].forEach(x => x.classList.toggle('on', x === b)); }
+  $('repView').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    segSelect($('repView'), b);
+    $('view-sales').classList.toggle('hidden', b.dataset.v !== 'sales');
+    $('view-stock').classList.toggle('hidden', b.dataset.v !== 'stock');
+  };
+  $('periodSeg').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    period = b.dataset.p; segSelect($('periodSeg'), b);
+  };
+
+  function getRange(p, ref) {
+    const d = dayOf(ref);
+    if (p === 'day') return { start: d, end: dayOf(d, 1) };
+    if (p === 'week') { const s = dayOf(d, -((d.getDay() + 6) % 7)); return { start: s, end: dayOf(s, 7) }; } // hafta pazartesi başlar
+    return { start: new Date(d.getFullYear(), d.getMonth(), 1), end: new Date(d.getFullYear(), d.getMonth() + 1, 1) };
+  }
+  function rangeLabel(p, { start, end }) {
+    const o = { day: 'numeric', month: 'long', year: 'numeric' };
+    if (p === 'day') return start.toLocaleDateString('tr-TR', { weekday: 'long', ...o });
+    if (p === 'week') return start.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }) + ' – ' + dayOf(end, -1).toLocaleDateString('tr-TR', o);
+    return start.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
+  }
+  // Eski satışlarda kategori/maliyet kaydı yoksa güncel ürün bilgisinden tamamla
+  function itemInfo(it) {
+    const p = (it.id && find(it.id)) || db.products.find(x => x.name === it.name);
+    const cat = it.cat != null ? it.cat : (p ? p.cat : '');
+    const cost = it.cost != null ? it.cost : (p ? p.cost : 0);
+    return { cat: cat || 'Kategorisiz', cost: +cost || 0 };
+  }
+  function summarize(range) {
+    const sales = db.sales.filter(s => { const t = new Date(s.date); return t >= range.start && t < range.end; });
+    let revenue = 0, qty = 0, profit = 0;
+    const cats = {}, prods = {};
+    sales.forEach(s => {
+      revenue += s.total;
+      s.items.forEach(it => {
+        const inf = itemInfo(it);
+        qty += it.qty; profit += it.total - inf.cost * it.qty;
+        cats[inf.cat] = (cats[inf.cat] || 0) + it.total;
+        const pr = prods[it.name] || (prods[it.name] = { name: it.name, cat: inf.cat, qty: 0, total: 0 });
+        pr.qty += it.qty; pr.total += it.total;
+      });
+    });
+    return { sales, revenue, qty, profit, cats, prods };
+  }
+  function buckets(p, range, sales) {
+    const s = range.start;
+    let n, idx, label, full, show;
+    if (p === 'day') {
+      n = 24; idx = t => t.getHours(); label = i => pad(i);
+      full = i => pad(i) + ':00 – ' + pad(i) + ':59'; show = i => i % 3 === 0;
+    } else if (p === 'week') {
+      n = 7; idx = t => Math.round((dayOf(t) - s) / DAY_MS); label = i => DAYS[i];
+      full = i => dayOf(s, i).toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' }); show = () => true;
+    } else {
+      n = new Date(s.getFullYear(), s.getMonth() + 1, 0).getDate(); idx = t => t.getDate() - 1; label = i => String(i + 1);
+      full = i => dayOf(s, i).toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' }); show = i => i === 0 || (i + 1) % 5 === 0;
+    }
+    const vals = new Array(n).fill(0);
+    sales.forEach(x => { const i = idx(new Date(x.date)); if (i >= 0 && i < n) vals[i] += x.total; });
+    return { vals, labels: vals.map((_, i) => label(i)), full: vals.map((_, i) => full(i)), show };
+  }
+  function niceMax(v) { // 4 eşit aralığa bölünen yuvarlak bir üst sınır
+    if (v <= 0) return 100;
+    const raw = v / 4, e = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / e;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e * 4;
+  }
+  const short = n => n >= 1000 ? (n / 1000).toLocaleString('tr-TR', { maximumFractionDigits: 1 }) + 'B' : String(Math.round(n));
+  function barChart({ vals, labels, show }) {
+    const W = 640, H = 210, L = 46, R = 8, T = 10, B = 26, cw = W - L - R, ch = H - T - B;
+    const max = niceMax(Math.max(...vals)), n = vals.length, slot = cw / n, bw = Math.max(3, slot * 0.62);
+    let g = '';
+    for (let k = 0; k <= 4; k++) {
+      const y = T + ch - ch * k / 4;
+      g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y}" y2="${y}"/><text class="axis" x="${L - 6}" y="${y + 3}" text-anchor="end">${short(max * k / 4)}</text>`;
+    }
+    vals.forEach((v, i) => {
+      const h = v / max * ch, x = L + slot * i + (slot - bw) / 2;
+      if (v > 0) g += `<rect class="bar" data-i="${i}" x="${x}" y="${T + ch - Math.max(h, 2)}" width="${bw}" height="${Math.max(h, 2)}" rx="${Math.min(4, bw / 2)}"/>`;
+      g += `<rect data-i="${i}" x="${L + slot * i}" y="${T}" width="${slot}" height="${ch + B}" fill="transparent" style="cursor:pointer"/>`;
+      if (show(i)) g += `<text class="axis" x="${L + slot * i + slot / 2}" y="${H - 8}" text-anchor="middle">${labels[i]}</text>`;
+    });
+    return `<svg viewBox="0 0 ${W} ${H}" id="barSvg">${g}</svg>`;
+  }
+  function donut(entries, total) {
+    const r = 58, c = 2 * Math.PI * r;
+    let off = 0, s = '';
+    entries.forEach(e => {
+      const len = e.v / total * c;
+      s += `<circle r="${r}" cx="80" cy="80" fill="none" stroke="${e.color}" stroke-width="26" stroke-dasharray="${len} ${c - len}" stroke-dashoffset="${-off}" transform="rotate(-90 80 80)"/>`;
+      off += len;
+    });
+    return `<svg viewBox="0 0 160 160"><circle r="${r}" cx="80" cy="80" fill="none" stroke="var(--fill)" stroke-width="26"/>${s}
+      <text x="80" y="76" text-anchor="middle" style="font-size:12px;fill:var(--muted)">Toplam</text>
+      <text x="80" y="96" text-anchor="middle" style="font-size:16px;font-weight:700;fill:var(--text)">${short(total)} ₺</text></svg>`;
+  }
+
+  $('makeReport').onclick = () => {
+    const ref = $('repDate').value ? new Date($('repDate').value + 'T12:00') : new Date();
+    const range = getRange(period, ref);
+    const cur = summarize(range);
+    const prev = summarize(getRange(period, dayOf(range.start, -1)));
+    const bk = buckets(period, range, cur.sales);
+    lastChart = bk;
+    const prevName = { day: 'önceki güne', week: 'önceki haftaya', month: 'önceki aya' }[period];
+    let delta = '';
+    if (prev.revenue > 0) {
+      const pc = (cur.revenue - prev.revenue) / prev.revenue * 100;
+      delta = `<div class="delta ${pc >= 0 ? 'up' : 'down'}">${pc >= 0 ? '▲' : '▼'} %${Math.abs(pc).toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ${prevName} göre</div>`;
+    }
+    const cats = Object.entries(cur.cats).sort((a, b) => b[1] - a[1]).map(([k, v], i) => ({ k, v, color: COLORS[i % COLORS.length] }));
+    const top = Object.values(cur.prods).sort((a, b) => b.total - a.total).slice(0, 10);
+    const pct = v => cur.revenue ? (v / cur.revenue * 100) : 0;
+
+    let html = `<div class="rep-head"><h2>${rangeLabel(period, range)}</h2>
+      <span class="muted small">${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} itibarıyla</span></div>
+      <div class="tiles2">
+        <div class="tl"><div class="k">Ciro</div><div class="v">${fmt(cur.revenue)}</div>${delta}</div>
+        <div class="tl"><div class="k">Tahmini kâr</div><div class="v">${fmt(cur.profit)}</div></div>
+        <div class="tl"><div class="k">Satış işlemi</div><div class="v">${cur.sales.length}</div></div>
+        <div class="tl"><div class="k">Satılan adet</div><div class="v">${cur.qty}</div></div>
+      </div>`;
+    if (!cur.sales.length) {
+      html += '<div class="card empty" style="margin-top:14px">Bu dönemde satış yok.</div>';
+    } else {
+      html += `<div class="sh">${period === 'day' ? 'Saatlere göre satış' : 'Günlere göre satış'}</div>
+        <div class="chart-card">${barChart(bk)}<div class="chart-info" id="chartInfo">Ayrıntı için bir çubuğa dokunun</div></div>
+        <div class="sh">Kategorilere göre satış</div>
+        <div class="chart-card"><div class="donut-wrap">${donut(cats, cur.revenue)}
+          <div class="legend">${cats.map(e => `
+            <div class="lg-row"><span class="dot" style="background:${e.color}"></span>
+              <div class="grow"><div style="display:flex;justify-content:space-between;gap:8px"><span>${esc(e.k)}</span><b>${fmt(e.v)}</b></div>
+              <div style="display:flex;align-items:center;gap:8px"><div class="meter" style="flex:1"><i style="width:${pct(e.v)}%;background:${e.color}"></i></div>
+              <span class="muted small" style="width:42px;text-align:right">%${pct(e.v).toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</span></div></div>
+            </div>`).join('')}</div></div></div>
+        <div class="sh">En çok satan ürünler</div>
+        <div class="list">${top.map((p, i) => `
+          <div class="li"><span class="muted" style="width:20px">${i + 1}</span>
+            <div class="grow"><div style="font-weight:600">${esc(p.name)}</div><div class="muted small">${esc(p.cat)} · ${p.qty} adet</div></div>
+            <b>${fmt(p.total)}</b></div>`).join('')}</div>`;
+    }
+    $('reportOut').innerHTML = html;
+  };
+  $('reportOut').onclick = e => {
+    const r = e.target.closest('[data-i]'); if (!r || !lastChart) return;
+    const i = +r.dataset.i;
+    document.querySelectorAll('#barSvg .bar').forEach(b => b.classList.toggle('sel', +b.dataset.i === i));
+    $('chartInfo').innerHTML = `<b style="color:var(--text)">${lastChart.full[i]}</b> · ${fmt(lastChart.vals[i])}`;
+  };
+
+  function renderAll() { renderSell(); renderProducts(); renderAlerts(); renderReport(); }
+  renderAll();
+})();
+</script>
+</body>
+</html>
