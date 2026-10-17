@@ -37,7 +37,6 @@ Eski kayıtlarda `dMin`, `items[].cat`, `items[].cost` olmayabilir; `norm()` ve 
 - **Rapor:** "Satış raporu" — Günlük / Haftalık (pazartesi başlar) / Aylık + tarih seçip "Rapor oluştur". Ciro, tahmini kâr, işlem sayısı, adet, önceki döneme göre % değişim, saatlik/günlük çubuk grafik (dokununca detay), kategori halka grafiği, en çok satan 10 ürün. "Stok durumu" — raf/depo adet ve maliyet/satış değerleri, son satışlar, yedek dışa/içe aktarma (JSON).
 
 ## Kullanıcının istediği ama henüz yapılmayanlar
-- **Test verisinin temizlenmesi.** Kurulumu test ederken "Kimchi Ramen" adlı örnek ürün ve iki test satışı eklendi; hem Drive'daki `stok-takip-verisi.json` dosyasında hem de localStorage'da duruyor. Kullanıcı gerçek ürünlerini girmeden önce Ürünler sekmesinden bu test ürününü silmesi (veya benden silmemi istemesi) gerekiyor.
 - **OAuth onay ekranı "Testing" modunda.** Şu an sadece ddkandogan@gmail.com giriş yapabilir. Kullanıcı ileride başka bir Google hesabıyla da girmek isterse (ör. çalışanı için), o e-postayı Google Cloud Console > Audience > Test users'a eklemek gerekir. "Production"a geçmek Google doğrulamasından geçmeyi gerektirir (onlarca kullanıcı için ihtiyaç yok).
 - **Bilinen sorun:** Claude artifact olarak yayınlanan sürümde Google girişi ve "Dışa aktar" (yedek indirme) çalışmıyor, çünkü orada hem Google script'i hem indirme izni engelli. Asıl kullanım yeri artık GitHub Pages adresi.
 
